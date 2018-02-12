@@ -74,8 +74,8 @@ class Core:
             # with the instance
             clone_id = self.driver.storage.clone(instance_id, parent_image_id)
 
-            # Should mount the clone on the diskless server and create a target,
-            #  there are 2 problems here:-
+            # Should mount the clone on the diskless server and create a
+            # target, there are 2 problems here:-
 
             # 1. Some operations may need to be done to setup clone like for
             # example a rbd map needs to be done for IET.
@@ -89,9 +89,9 @@ class Core:
             # other class can implement.
             # * There should a Diskless Storage driver for every
             # diskless-storage combination we want to support.
-            # * The diskless storage driver is going to be passed as an argument
-            # to diskless driver during init and the diskless driver is going
-            # to use it in mount and unmount clone calls.
+            # * The diskless storage driver is going to be passed as an
+            # argument to diskless driver during init and the diskless driver
+            # is going to use it in mount and unmount clone calls.
             target_id = self.driver.diskless.mount_clone(instance_id, clone_id)
 
             # I dont see a reason yet to write a pxe driver as PXE, DHCP and
@@ -122,8 +122,8 @@ class Core:
 
         try:
 
-            self.driver.authorization.check_entity_node_access(self.entity_id,
-                                                               dest_mac_address)
+            self.driver.authorization.\
+                check_entity_node_access(self.entity_id, dest_mac_address)
 
             if self.db.provisionedInstance.get_info(instance_id).entityId \
                     != self.entity_id:
@@ -191,8 +191,8 @@ class Core:
             # This is not possible currently as provisioned instance table
             # doesnt have a foreign key to image table, but I feel this is the
             # right way.
-            parent_image_id = self.db.provisionedInstance.get_info(instance_id) \
-                .parent_image_id
+            parent_image_id = self.db.provisionedInstance.\
+                get_info(instance_id).parent_image_id
 
             # Insert Snapshot into DB
             global_image = self.db.image.get_info(parent_image_id)
