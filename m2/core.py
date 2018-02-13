@@ -1,4 +1,4 @@
-""" Core of M2 which is the backend of the REST API"""
+""" Core of M2 which is the backend of the REST API """
 
 
 # TODO Enforce Quota Checks
@@ -92,7 +92,7 @@ class Core:
             # * The diskless storage driver is going to be passed as an
             # argument to diskless driver during init and the diskless driver
             # is going to use it in mount and unmount clone calls.
-            target_id = self.driver.diskless.mount_clone(instance_id, clone_id)
+            target_id = self.driver.diskless.add_target(instance_id, clone_id)
 
             # I dont see a reason yet to write a pxe driver as PXE, DHCP and
             # TFTP are all protocols and driver is just going to generate files
@@ -122,7 +122,7 @@ class Core:
 
         try:
 
-            self.driver.authorization.\
+            self.driver.authorization. \
                 check_entity_node_access(self.entity_id, dest_mac_address)
 
             if self.db.provisionedInstance.get_info(instance_id).entityId \
@@ -155,7 +155,7 @@ class Core:
 
             self.driver.pxe.unregister(instance_id)
             # Unmount Clone from diskless
-            self.driver.diskless.unmount_clone(instance_id)
+            self.driver.diskless.delete_target(instance_id)
             # Delete Clone in Storage
             self.driver.storage.delete_clone(instance_id)
             # Delete Container if not being used.
@@ -191,7 +191,7 @@ class Core:
             # This is not possible currently as provisioned instance table
             # doesnt have a foreign key to image table, but I feel this is the
             # right way.
-            parent_image_id = self.db.provisionedInstance.\
+            parent_image_id = self.db.provisionedInstance. \
                 get_info(instance_id).parent_image_id
 
             # Insert Snapshot into DB
@@ -204,6 +204,162 @@ class Core:
             self.driver.storage.snapshot(instance_id, snap_image_id)
 
             return snap_image_id
+
+        except Exception:
+            pass
+
+    def tag(self, instance_id, tag_name):
+        """
+        Create a shallow copy of the provisioned instance's current state
+        (filesystem only) by copying the clone.
+
+        :param instance_id: Id of the provisioned instance
+        :param tag_name: Name of the new tag
+        :return: Tag Id
+        """
+
+        try:
+            if self.db.provisionedInstance.get_info(instance_id).entityId \
+                    != self.entity_id:
+                raise Exception
+
+            # Turns is_active bit for all tags under instance_id to False
+            self.db.tag.deactivate_all_tags(instance_id)
+            # Insert new Tag
+            tag_id = self.db.tag.insert(tag_name, instance_id, is_active=True)
+
+            # Create Tag
+            self.driver.storage.tag(instance_id, tag_id)
+
+            return tag_id
+
+        except Exception:
+            pass
+
+    # Confusion about Tag commands regarding Ids. Need to discuss
+    # Assuming that Id is going to be unique under a provisioned instance id
+    def update_tag(self, instance_id, tag_id, info):
+        """
+        Update Tag Meta Data
+
+        :param instance_id: Id of the provisioned instance
+        :param tag_id: Id of the tag
+        :param info: Dictionary of new info that needs to be updated
+        :return: None
+        """
+
+        try:
+
+            if self.db.provisionedInstance.get_info(instance_id).entityId \
+                    != self.entity_id:
+                raise Exception
+
+            # Check If Tag Exists
+            self.db.tag.get_info(instance_id, tag_id)
+
+            # Update Tag
+            self.db.tag.update(instance_id, tag_id, info)
+
+        except Exception:
+            pass
+
+    def delete_tag(self, instance_id, tag_id):
+        """
+        Delete Tag
+
+        :param instance_id: Id of the provisioned instance
+        :param tag_id: Id of the tag
+        :return: None
+        """
+
+        try:
+
+            if self.db.provisionedInstance.get_info(instance_id).entityId \
+                    != self.entity_id:
+                raise Exception
+
+            # Check If Tag Exists
+            self.db.tag.get_info(instance_id, tag_id)
+
+            # Delete Tag in Storage and in db.
+            self.driver.storage.delete_tag(instance_id, tag_id)
+            self.db.tag.delete(instance_id, tag_id)
+
+        except Exception:
+            pass
+
+    def list_tags(self, instance_id):
+        """
+        List Tags for provisioned instance
+
+        :param instance_id: Id of provisioned instance
+        :return: List of tag_ids
+        """
+
+        try:
+
+            if self.db.provisionedInstance.get_info(instance_id).entityId \
+                    != self.entity_id:
+                raise Exception
+
+            # Just Get tag_ids from db and return
+            return self.db.provisionedInstance.get_tags(instance_id)
+
+        except Exception:
+            pass
+
+    def show_tag(self, instance_id, tag_id):
+        """
+        Get Tag Meta Data
+
+        :param instance_id: Id of the provisioned instance
+        :param tag_id: Id of the tag
+        :return: Tag Info as an object
+        """
+
+        try:
+
+            if self.db.provisionedInstance.get_info(instance_id).entityId \
+                    != self.entity_id:
+                raise Exception
+
+            # Get and return info
+            return self.db.tag.get_info(instance_id, tag_id)
+
+        except Exception:
+            pass
+
+    def flatten_tag(self, instance_id, tag_id, image_name):
+        """
+        Flatten Tag into an image
+
+        :param instance_id: Id of the provisioned instance
+        :param tag_id: Id of the tag
+        :param image_name: name of the flattened image
+        :return: Image Id
+        """
+
+        try:
+
+            if self.db.provisionedInstance.get_info(instance_id).entityId \
+                    != self.entity_id:
+                raise Exception
+
+            self.db.tag.get_info(instance_id, tag_id)
+
+            # Get Parent Image, Check comments in snapshot
+            parent_image_id = self.db.provisionedInstance. \
+                get_info(instance_id).parent_image_id
+            parent_image = self.db.image.get_info(parent_image_id)
+
+            # Insert Image
+            image_id = self.db.image.insert(image_name, self.entity_id,
+                                            parent_image.type)
+
+            # Flatten Tag
+            self.driver.storage.flatten_tag(instance_id, tag_id, image_id)
+
+            return image_id
 
         except Exception:
             pass
