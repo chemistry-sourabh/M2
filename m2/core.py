@@ -493,10 +493,26 @@ class Core:
     def upload(self, image_name, image_type, datastore_id=None,
                is_public=False,
                url=None):
+        """
+        Upload image to M2
+
+        :param image_name: Name of the image
+        :param image_type: Type of the image
+        :param datastore_id: Id of the datastore (Ignored)
+        :param is_public: True if public
+        :param url: HTTP url of the image
+        :return: Id of the image
+        """
         pass
 
     # Didnt figure out from last time how to implement this.
     def download(self, image_id):
+        """
+        Download image
+
+        :param image_id: Id of the image
+        :return: Byte stream
+        """
         pass
 
     def copy(self, image_id, dest_image_name, dest_entity_id=None,
