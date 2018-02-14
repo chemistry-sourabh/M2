@@ -3,17 +3,21 @@
 
 # TODO Enforce Quota Checks
 # TODO Check Authorization
+# TODO Add Admin Level Stuff
 class Core:
     """
     The class that will process a REST request.
     Currently will only work with middleware.
     """
 
-    def __init__(self, entity_id, config, driver):
+    # Can be extended for DB Auth by doing some architecture change
+    # Authentication Driver should be used in rest.py to get entity object
+    # and passed here.
+    def __init__(self, entity, config, driver):
         """
         Initializes DB and other parameters
 
-        :param entity_id: The Id of the entity that has sent the request.
+        :param entity: Entity Object
         :param config: The Config Object
         :param driver: Object whose attributes are loaded driver objects
         """
@@ -25,7 +29,8 @@ class Core:
         self.db = None
 
         self.driver = driver
-        self.entity_id = entity_id
+        self.entity_id = entity.id
+        self.entity_is_admin = entity.is_admin
         self.config = config
 
     # provision_engine_id is in rest_api.md, but do we really need it ?
@@ -302,7 +307,7 @@ class Core:
                     != self.entity_id:
                 raise Exception
 
-            # Just Get tag_ids from db and return
+            # Just Get tag objects from db and return
             return self.db.provisionedInstance.get_tags(instance_id)
 
         except Exception:
@@ -363,3 +368,242 @@ class Core:
 
         except Exception:
             pass
+
+    def list_instances(self):
+        """
+        List all provisioned instances for entity
+
+        :return: List of instance objects
+        """
+
+        try:
+
+            return self.db.provisionedInstance.get_all(self.entity_id)
+
+        except Exception:
+            pass
+
+    def show_instance(self, instance_id):
+        """
+        Get Instance Details
+
+        :return: Instance Object
+        """
+
+        try:
+
+            instance = self.db.provisionedInstance.get_info(instance_id)
+
+            if instance.entityId != self.entity_id:
+                raise Exception
+
+            return instance
+
+        except Exception:
+            pass
+
+    # Function should be added for inserting new entity into quota table.
+    # Should check if entity is in quota table before proceeding
+    # Add current_usage column to Quota to avoid long counting operations ?
+    def update_quota(self, entity_id, info):
+        """
+        Update Entity's quota object with new info
+
+        ADMIN OPERATION
+
+        :param entity_id: Id of the entity that should be updated
+        :param info: new info as dictionary
+        :return: None
+        """
+
+        try:
+
+            if self.entity_is_admin:
+                self.db.quota.update(entity_id, info)
+            else:
+                raise Exception
+
+        except Exception:
+            pass
+
+    def list_quota(self):
+        """
+        List quota of all registered entities
+
+        ADMIN OPERATION
+
+        :return: List of Quota Objects
+        """
+
+        try:
+
+            if self.entity_is_admin:
+                return self.db.quota.get_all()
+            else:
+                raise Exception
+
+        except Exception:
+            pass
+
+    def show_quota(self, entity_id):
+        """
+        Get Quota of Registered Entity
+
+        ADMIN OPERATION
+
+        :param entity_id: Id of the entity
+        :return: Quota Object
+        """
+
+        try:
+
+            if self.entity_is_admin:
+                return self.db.quota.get_info(entity_id)
+            else:
+                raise Exception
+
+        except Exception:
+            pass
+
+    # This function doesnt exist in the REST API, but should
+    def register(self, entity_id, quota):
+        """
+        Add Quota for Entity
+
+        ADMIN OPERATION
+
+        :param entity_id: Id of the entity
+        :param quota: Quota of the entity
+        :return: Id of the new quota
+        """
+
+        try:
+
+            if self.entity_is_admin:
+                return self.db.quota.insert(entity_id, quota)
+            else:
+                raise Exception
+
+        except Exception:
+            pass
+
+    # Didnt figure out from last time how to implement this.
+    # Do we want to support multiple datastores right now. For the first
+    # prototype version we can implement a single datastore version
+    def upload(self, image_name, image_type, datastore_id=None,
+               is_public=False,
+               url=None):
+        pass
+
+    # Didnt figure out from last time how to implement this.
+    def download(self, image_id):
+        pass
+
+    def copy(self, image_id, dest_image_name, dest_entity_id=None,
+             dest_datastore_id=None):
+        """
+        Do a deep copy of an image
+
+        :param image_id: Id of the image to copy
+        :param dest_image_name: name of the image copy
+        :param dest_entity_id: Id of the destination entity (Admin Only)
+        :param dest_datastore_id: Id of the destination datastore (Ignored)
+        :return: Id of the copied image
+        """
+
+        try:
+
+            # Check If entity has access to image
+            image = self.db.image.get_info(image_id)
+            if image.entityId != self.entity_id:
+                raise Exception
+
+            # Check If dest_entity_id is set then check if admin and execute
+            if dest_entity_id is not None and self.entity_id != dest_entity_id:
+                if self.entity_is_admin:
+                    new_image_id = self.db.image.insert(dest_image_name,
+                                                        dest_entity_id,
+                                                        image.type)
+
+                else:
+                    raise Exception
+
+            else:
+                new_image_id = self.db.image.insert(dest_image_name,
+                                                    self.entity_id,
+                                                    image.type)
+
+            # After DB insertion do the actual copy
+            self.driver.storage.copy(image_id, new_image_id)
+            return new_image_id
+
+        except Exception:
+            pass
+
+    def update_image(self, image_id, info):
+        """
+        Update metadata of image
+
+        :param image_id: Id of the image
+        :param info: New info as a dictionary
+        :return: None
+        """
+        try:
+            if self.db.image.get_info(image_id).entityId != self.entity_id:
+                raise Exception
+
+            self.db.image.update(image_id, info)
+
+        except Exception:
+            pass
+
+    def delete_image(self, image_id):
+        """
+        Delete image
+
+        :param image_id: Id of the image
+        :return: None
+        """
+        try:
+            if self.db.image.get_info(image_id).entityId != self.entity_id:
+                raise Exception
+
+            self.driver.storage.delete_image(image_id)
+            self.db.image.delete(image_id)
+
+        except Exception:
+            pass
+
+    def list_images(self):
+        """
+        List all images of an entity
+
+        :return: List of Image objects
+        """
+
+        try:
+
+            return self.db.image.get_all(self.entity_id)
+
+        except Exception:
+            pass
+
+    def show_image(self, image_id):
+        """
+        Get Details of image
+
+        :param image_id: Id of the image
+        :return: Image object
+        """
+
+        try:
+            if self.db.image.get_info(image_id).entityId != self.entity_id:
+                raise Exception
+
+            return self.db.image.get_info(image_id)
+
+        except Exception:
+            pass
+
+    # Get Supported Types can be implemented in rest as it is a constansts list
+    # How to implement List Datastores and List Provisioning Engines
