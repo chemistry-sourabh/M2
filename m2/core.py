@@ -53,19 +53,22 @@ class Core:
 
         try:
 
-            # Check whether entity has access to node and network
-            self.driver.authorization.check_entity_node_access(self.entity_id,
-                                                               mac_address)
-            self.driver.authorization.check_entity_network_access(
-                self.entity_id,
-                network_id)
+            # Skip Check if admin
+            if not self.entity_is_admin:
+                # Check whether entity has access to node and network
+                self.driver.authorization. \
+                    check_entity_node_access(self.entity_id, mac_address)
+                self.driver.authorization. \
+                    check_entity_network_access(self.entity_id, network_id)
 
-            # Check whether entity owns image
-            # TODO make into helper function
-            if self.db.image.get_info(parent_image_id).entityId \
-                    != self.entity_id:
-                raise Exception
+                # Check whether entity owns image
+                # TODO make into helper function
+                if self.db.image.get_info(parent_image_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
+            # What About Admin? I feel that his/her entity_id should be used,
+            # instead of the user's.
             # Create new Provisioned Instance in DB
             instance_id = self.db.provisionedInstance.insert(instance_name,
                                                              instance_type,
@@ -127,12 +130,13 @@ class Core:
 
         try:
 
-            self.driver.authorization. \
-                check_entity_node_access(self.entity_id, dest_mac_address)
+            if not self.entity_is_admin:
+                self.driver.authorization. \
+                    check_entity_node_access(self.entity_id, dest_mac_address)
 
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             # Get Target Id associated with instance id
             target_id = self.driver.diskless.get_target_id(instance_id)
@@ -155,8 +159,10 @@ class Core:
 
         try:
             instance = self.db.provisionedInstance.get_info(instance_id)
-            if instance.entityId != self.entity_id:
-                raise Exception
+
+            if not self.entity_is_admin:
+                if instance.entityId != self.entity_id:
+                    raise Exception
 
             self.driver.pxe.unregister(instance_id)
             # Unmount Clone from diskless
@@ -182,9 +188,11 @@ class Core:
         """
 
         try:
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+
+            if not self.entity_is_admin:
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             # This is how it is currently done, but shouldnt be as we are
             # dictating that the clone should have a parent_image_id in the
@@ -213,6 +221,7 @@ class Core:
         except Exception:
             pass
 
+    # Add restore_tag to the rest api?
     def tag(self, instance_id, tag_name):
         """
         Create a shallow copy of the provisioned instance's current state
@@ -224,9 +233,10 @@ class Core:
         """
 
         try:
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+            if not self.entity_is_admin:
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             # Turns is_active bit for all tags under instance_id to False
             self.db.tag.deactivate_all_tags(instance_id)
@@ -255,9 +265,10 @@ class Core:
 
         try:
 
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+            if not self.entity_is_admin:
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             # Check If Tag Exists
             self.db.tag.get_info(instance_id, tag_id)
@@ -279,9 +290,10 @@ class Core:
 
         try:
 
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+            if not self.entity_is_admin:
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             # Check If Tag Exists
             self.db.tag.get_info(instance_id, tag_id)
@@ -303,9 +315,10 @@ class Core:
 
         try:
 
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+            if not self.entity_is_admin:
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             # Just Get tag objects from db and return
             return self.db.provisionedInstance.get_tags(instance_id)
@@ -324,9 +337,10 @@ class Core:
 
         try:
 
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+            if not self.entity_is_admin:
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             # Get and return info
             return self.db.tag.get_info(instance_id, tag_id)
@@ -346,9 +360,10 @@ class Core:
 
         try:
 
-            if self.db.provisionedInstance.get_info(instance_id).entityId \
-                    != self.entity_id:
-                raise Exception
+            if not self.entity_is_admin:
+                if self.db.provisionedInstance.get_info(instance_id).entityId \
+                        != self.entity_id:
+                    raise Exception
 
             self.db.tag.get_info(instance_id, tag_id)
 
@@ -377,8 +392,10 @@ class Core:
         """
 
         try:
-
-            return self.db.provisionedInstance.get_all(self.entity_id)
+            if self.entity_is_admin:
+                self.db.provisionedInstance.get_all()
+            else:
+                return self.db.provisionedInstance.get_all(self.entity_id)
 
         except Exception:
             pass
@@ -394,8 +411,9 @@ class Core:
 
             instance = self.db.provisionedInstance.get_info(instance_id)
 
-            if instance.entityId != self.entity_id:
-                raise Exception
+            if not self.entity_is_admin:
+                if instance.entityId != self.entity_id:
+                    raise Exception
 
             return instance
 
@@ -529,22 +547,23 @@ class Core:
 
         try:
 
-            # Check If entity has access to image
             image = self.db.image.get_info(image_id)
-            if image.entityId != self.entity_id:
-                raise Exception
 
             # Check If dest_entity_id is set then check if admin and execute
-            if dest_entity_id is not None and self.entity_id != dest_entity_id:
-                if self.entity_is_admin:
-                    new_image_id = self.db.image.insert(dest_image_name,
-                                                        dest_entity_id,
-                                                        image.type)
+            if dest_entity_id is not None and self.entity_is_admin:
+                new_image_id = self.db.image.insert(dest_image_name,
+                                                    dest_entity_id,
+                                                    image.type)
 
-                else:
-                    raise Exception
+            elif dest_entity_id is not None and self.entity_is_admin \
+                    and self.entity_id != dest_entity_id:
+                raise Exception
 
             else:
+                # Check If entity has access to image
+                if image.entityId != self.entity_id:
+                    raise Exception
+
                 new_image_id = self.db.image.insert(dest_image_name,
                                                     self.entity_id,
                                                     image.type)
@@ -565,8 +584,10 @@ class Core:
         :return: None
         """
         try:
-            if self.db.image.get_info(image_id).entityId != self.entity_id:
-                raise Exception
+
+            if not self.entity_is_admin:
+                if self.db.image.get_info(image_id).entityId != self.entity_id:
+                    raise Exception
 
             self.db.image.update(image_id, info)
 
@@ -581,8 +602,10 @@ class Core:
         :return: None
         """
         try:
-            if self.db.image.get_info(image_id).entityId != self.entity_id:
-                raise Exception
+
+            if not self.entity_is_admin:
+                if self.db.image.get_info(image_id).entityId != self.entity_id:
+                    raise Exception
 
             self.driver.storage.delete_image(image_id)
             self.db.image.delete(image_id)
@@ -599,7 +622,10 @@ class Core:
 
         try:
 
-            return self.db.image.get_all(self.entity_id)
+            if self.entity_is_admin:
+                return self.db.image.get_all()
+            else:
+                return self.db.image.get_all(self.entity_id)
 
         except Exception:
             pass
@@ -613,8 +639,10 @@ class Core:
         """
 
         try:
-            if self.db.image.get_info(image_id).entityId != self.entity_id:
-                raise Exception
+
+            if not self.entity_is_admin:
+                if self.db.image.get_info(image_id).entityId != self.entity_id:
+                    raise Exception
 
             return self.db.image.get_info(image_id)
 
